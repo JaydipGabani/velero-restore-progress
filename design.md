@@ -22,6 +22,7 @@ There are two approches to give out this update:
     - Get the total number of items from `Backup` CR
     - Maintain a counter for skipped items and restore item
     - Give out update when an item is skipped or restore in the form of:
+    
             ```
             TotalItems: n
             Skipped: y
@@ -34,8 +35,8 @@ There are two approches to give out this update:
         ```
         TotalItem: n
         Restored: x
-        ```restoreResource
-        This could be a similar implementation as Backup progress update
+        ```
+        This could be a similar implementation as Backup progress update.
 
 
 ## Detailed Design
