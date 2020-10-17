@@ -1,6 +1,21 @@
 # Restore progress update
 
-Velero backup supports real-time update with total number of items that is going to be backed up and items that are already backed up. Velero Restore only provides state of the restore, `InProgress, Completed, PartiallyFailed, Failed`, as an update for restore. Restore workflow needs to have same support as backup and update the Restore CR in real-time with same information.
+Velero _Backup_ resource provides real-time progress of an ongoing backup by means of a _Progress_ field in the CR. Velero _Restore_, on the other hand, only shows one of the phases (InProgress, Completed, PartiallyFailed, Failed) of the ongoing restore. In this document, we propose detailed progress reporting for Velero _Restore_. With the introduction of the proposed _Progress_ field, Velero _Restore_ CR will look like:
+
+```yml
+apiVersion: velero.io/v1
+kind: Restore
+metadata:
+  name: test-restore
+  namespace: velero
+spec:
+    [...]
+status:
+  phase: InProgress
+  progress:
+    itemsRestored: 100
+    totalItems: 140
+```
 
 ## Goals
 
@@ -8,10 +23,11 @@ Velero backup supports real-time update with total number of items that is going
 
 ## Non Goals
 
-
+- Estimate time to completion
 
 ## Background
 
+The current _Restore_ CR lets users know whether a restore is in-progress or completed (failed/succeeded). While this basic piece of information about the restore is useful to the end user, there seems to be room for improvement in the user experience. The _Restore_ CR can show detailed progress in terms of the number of resources restored so far and the total number of resources to be restored. This will be particularly useful for restores that run for a longer duration of time. Such progress reporting already exists for Velero _Backup_. This document proposes similar implementation for Velero _Restore_.
 
 
 ## High-Level Design
@@ -30,6 +46,9 @@ There are two approches to give out this update:
             ```
 
 2. Two Phase approach (long term goal):
+
+This approach divides the restore process in two steps. The first step collects the number of all items to be restored from the backup tarball. It applies the label selector and include/exclude rules on the resources / items and stores all items (preserving the priority order) in an in-memory data structure. The second step reads the collected items and restores them. 
+
     - Predetermine which resources are going to be restored before actual restore takes place
     - Give out an update when an item is restored in form of:
         ```
