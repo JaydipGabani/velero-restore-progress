@@ -64,4 +64,114 @@ This approach divides the restore process in two steps. The first step collects 
 
 We propose to maintain two counters, one for skipped items and one for restored items. Weather an item or a resoure is going to be skipped or not is decided on the run. A counter can be maintained within [execute()](https://github.com/vmware-tanzu/velero/blob/e69fac153ba60dc5129cdda51480a64fbf47b851/pkg/restore/restore.go#L352) function to track the count when an item is skipped and when an item is restored. Update the `Restore` CR status field with message indicating `TotalItems`, `Skipped` , and `Restored` whenever an Item is restored.
 
+### Two pass approach
 
+#### Progress struct
+
+A new struct will be introduced to store progress information:
+
+```go
+type RestoreProgress struct {
+    TotalItems    int `json:"totalItems,omitempty`
+    ItemsRestored int `json:"itemsRestored,omitempty`
+}
+```
+
+`RestoreStatus` will include the above struct:
+
+```go
+type RestoreStatus struct {
+    [...]
+
+    Progress *RestoreProgress `json:"progress,omitempty"`
+}
+```
+
+#### Modifications to restore.go
+
+Currently, the restore process works by looping through the resources in the backup tarball and restoring them one-by-one in the same pass:
+
+```go
+func (ctx *context) execute(...) {
+    [...]
+
+    for _, resource := range getOrderedResources(...) {
+        [...]
+
+        for namespace, items := range resourceList.ItemsByNamespace {
+            [...]
+
+            for _, item := range items {
+                [...]
+
+                // restore item here
+                w, e := restoreItem(...)
+            }
+        }
+    }
+}
+```
+
+We propose to remove the call to `restoreItem()` in the inner most loop and instead store the item in a data structure. Once all the items are collected, we loop through the array of collected items and make a call to `restoreItem()`:
+
+```go
+func (ctx *context) execute(...) {
+    [...]
+
+    // get all items
+    resources := ctx.getOrderedResourceCollection(...)
+
+    for _, resource := range resources {
+        [...]
+
+        for _, items := range resource.itemsByNamespace {
+            [...]
+
+            for _, item := range items {
+                [...]
+
+                // restore the item
+                w, e := restoreItem(...)
+            }
+        }
+    }
+
+    [...]
+}
+
+func (ctx *context) getOrderedResourceCollection(...) {
+    for _, namespace := range getOrderedResources(...) {
+        [...]
+
+        for namespace, items := range resourceList.ItemsByNamespace {
+            [...]
+
+            for _, item := range items {
+                [...]
+
+                // store item in a data structure
+                collectedResources.itemsByNamespace[originalNamespace] = item
+            }
+        }
+    }
+    return collectedResources
+}
+```
+
+We introduce two new structs to hold the collected items:
+
+```go
+type restoreResource struct {
+    resource            string
+    itemsByNamespace    map[string][]restoreItem
+}
+```
+
+```go
+type restoreItem struct {
+    targetNamespace string
+    name            string
+}
+```
+
+Each group resource is represented by `restoreResource`. The map `itemsByNamespace` is indexed by `originalNamespace`, and the values are list of `items` in the original namespace. Each item represented by `restoreItem` has `name` and the resolved `targetNamespace`.
