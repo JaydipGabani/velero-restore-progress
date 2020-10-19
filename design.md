@@ -27,11 +27,11 @@ status:
 
 ## Background
 
-The current _Restore_ CR lets users know whether a restore is in-progress or completed (failed/succeeded). While this basic piece of information about the restore is useful to the end user, there seems to be room for improvement to the user experience. The _Restore_ CR can show detailed progress in terms of the number of resources restored so far and the total number of resources to be restored. This will be particularly useful for restores that run for a longer duration of time. Such progress reporting already exists for Velero _Backup_. This document proposes similar implementation for Velero _Restore_.
+The current _Restore_ CR lets users know whether a restore is in-progress or completed (failed/succeeded). While this basic piece of information is useful to the end user, there seems to be room for improvement in the user experience. The _Restore_ CR can show detailed progress in terms of the number of resources restored so far and the total number of resources to be restored. This will be particularly useful for restores that run for a longer duration of time. Such progress reporting already exists for Velero _Backup_. This document proposes similar implementation for Velero _Restore_.
 
 ## High-Level Design
 
-We propose to divide the restore process in two steps. The first step collects the number of all items to be restored from the backup tarball. It applies the label selector and include/exclude rules on the resources / items and stores all items (preserving the priority order) in an in-memory data structure. The second step reads the collected items and restores them.
+We propose to divide the restore process in two steps. The first step will collect all the items to be restored from the backup tarball. It will apply the label selector and include/exclude rules on the resources / items and store them (preserving the priority order) in an in-memory data structure. The second step will read the collected items and restore them. 
 
 ## Detailed Design
 
@@ -154,4 +154,4 @@ The additional items returned by the plugins will still be discovered at the tim
 
 ### Updating progress 
 
-The updates to the `progress` field in the CR can be sent on a channel as soon as a item is restored. A goroutine receiving update on that channel can make an `Update()` call to update the _Restore_ CR.
+The updates to the `progress` field in the CR can be sent on a channel as soon as an item is restored. A goroutine receiving update on that channel can make an `Update()` call to update the _Restore_ CR.
